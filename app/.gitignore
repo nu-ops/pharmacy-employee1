@@ -1,9 +1,0 @@
-# Python байт-код, кэши 
-__pycache__/ 
-# Виртуальные окружения 
-venv/ 
-.env/ 
-# IDE и редакторы 
-.vscode/ 
-.idea/ 
-*.swp
