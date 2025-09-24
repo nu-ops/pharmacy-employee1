@@ -1,16 +1,15 @@
 from sqlmodel import SQLModel, create_engine, Session
 from argon2 import PasswordHasher
 from dotenv import load_dotenv
-import os
 
-# Загрузка переменных окружения
+# Загрузка переменных окружения из .env файла
 load_dotenv()
 
-# Инициализация хэшера Argon2
+# Инициализация хэшера
 ph = PasswordHasher()
 
 # Настройки базы данных
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:123@localhost:5432/curs")
+DATABASE_URL = "postgresql://postgres:123@localhost:5432/curs"
 
 # Создание движка
 engine = create_engine(DATABASE_URL, echo=True)
