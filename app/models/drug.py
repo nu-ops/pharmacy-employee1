@@ -13,8 +13,8 @@ class Drug(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.now)
     
     # Relationships - используем строки для избежания циклических импортов
-    properties: List["DrugProperty"] = Relationship(back_populates="drug")
-    sales: List["Sale"] = Relationship(back_populates="drug")
+    properties: List["DrugProperty"] = Relationship(back_populates="drug") # type: ignore
+    sales: List["Sale"] = Relationship(back_populates="drug") # type: ignore
     
     def __repr__(self):
         return f"Drug(id={self.id}, name='{self.name}', price={self.price}, quantity={self.quantity})"
