@@ -1,69 +1,52 @@
-from db.database import get_connection
+from sqlmodel import select, Session
+from typing import List, Optional
+from models.pharmacy import Pharmacy
 
-def add_pharmacy(address, city, phone):
+def add_pharmacy(session: Session, address: str, city: str, phone: Optional[str]) -> Optional[Pharmacy]:
     """
     Добавляет новую аптеку в базу данных
-    :param address: Адрес аптеки
-    :param city: Город, в котором находится аптека
-    :param phone: Телефон аптеки
-    :return: True если аптека успешно добавлена, False в случае ошибки
     """
-    conn = get_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute("""
-            INSERT INTO pharmacies (address, city, phone)
-            VALUES (%s, %s, %s)
-        """, (address, city, phone))
-        conn.commit()
+        pharmacy = Pharmacy(
+            address=address,
+            city=city,
+            phone=phone
+        )
+        session.add(pharmacy)
+        session.commit()
+        session.refresh(pharmacy)
         print(f"Аптека по адресу '{address}' добавлена")
-        return True
+        return pharmacy
     except Exception as e:
+        session.rollback()
         print(f"Ошибка при добавлении аптеки: {e}")
-        conn.rollback()
-        return False
-    finally:
-        cursor.close()
-        conn.close()
+        return None
 
-def get_all_pharmacies():
+def get_all_pharmacies(session: Session) -> List[Pharmacy]:
     """
     Получает все аптеки из базы данных
-    :return: Список всех аптек или пустой список в случае ошибки
     """
-    conn = get_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute("SELECT * FROM pharmacies ORDER BY city, address")
-        columns = [desc[0] for desc in cursor.description]
-        pharmacies = []
-        for row in cursor.fetchall():
-            pharmacies.append(dict(zip(columns, row)))
+        statement = select(Pharmacy).order_by(Pharmacy.city, Pharmacy.address)
+        pharmacies = session.exec(statement).all()
         return pharmacies
     except Exception as e:
         print(f"Ошибка при получении аптек: {e}")
         return []
-    finally:
-        cursor.close()
-        conn.close()
 
-def del_pharmacy(id):
+def del_pharmacy(session: Session, id: int) -> bool:
     """
     Удаляет аптеку по указанному ID
-    :param id: ID аптеки для удаления
-    :return: True если аптека успешно удалена, False в случае ошибки
     """
-    conn = get_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute("DELETE FROM pharmacies WHERE id = %s", (id,))
-        conn.commit()
-        print(f"Аптека с ID '{id}' удалена")
-        return True
-    except Exception as e:
-        print(f"Ошибка при удалении аптеки: {e}")
-        conn.rollback()
+        pharmacy = session.get(Pharmacy, id)
+        if pharmacy:
+            session.delete(pharmacy)
+            session.commit()
+            print(f"Аптека с ID '{id}' удалена")
+            return True
         return False
-    finally:
-        cursor.close()
-        conn.close()
+    except Exception as e:
+        session.rollback()
+        print(f"Ошибка при удалении аптеки: {e}")
+        return False

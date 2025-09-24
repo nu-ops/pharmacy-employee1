@@ -1,94 +1,75 @@
-from db.database import get_connection
+from sqlmodel import select, Session
+from typing import List, Optional
+from models.supplier import Supplier
 
-def add_supplier(name, contact_person, phone, email):
+def add_supplier(session: Session, name: str, contact_person: Optional[str], 
+                phone: Optional[str], email: Optional[str]) -> Optional[Supplier]:
     """
     Добавляет нового поставщика в базу данных
-    :param name: Название поставщика
-    :param contact_person: Контактное лицо
-    :param phone: Телефон поставщика
-    :param email: Email поставщика
-    :return: True если поставщик успешно добавлен, False в случае ошибки
     """
-    conn = get_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute("""
-            INSERT INTO suppliers (name, contact_person, phone, email)
-            VALUES (%s, %s, %s, %s)
-        """, (name, contact_person, phone, email))
-        conn.commit()
+        supplier = Supplier(
+            name=name,
+            contact_person=contact_person,
+            phone=phone,
+            email=email
+        )
+        session.add(supplier)
+        session.commit()
+        session.refresh(supplier)
         print(f"Поставщик '{name}' добавлен")
-        return True
+        return supplier
     except Exception as e:
+        session.rollback()
         print(f"Ошибка при добавлении поставщика: {e}")
-        conn.rollback()
-        return False
-    finally:
-        cursor.close()
-        conn.close()
+        return None
 
-def get_all_suppliers():
+def get_all_suppliers(session: Session) -> List[Supplier]:
     """
     Получает всех поставщиков из базы данных
-    :return: Список всех поставщиков или пустой список в случае ошибки
     """
-    conn = get_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute("SELECT * FROM suppliers ORDER BY name")
-        columns = [desc[0] for desc in cursor.description]
-        suppliers = []
-        for row in cursor.fetchall():
-            suppliers.append(dict(zip(columns, row)))
+        statement = select(Supplier).order_by(Supplier.name)
+        suppliers = session.exec(statement).all()
         return suppliers
     except Exception as e:
         print(f"Ошибка при получении поставщиков: {e}")
         return []
-    finally:
-        cursor.close()
-        conn.close()
 
-def del_suppliers(id):
+def del_supplier(session: Session, id: int) -> bool:
     """
     Удаляет поставщика по указанному ID
-    :param id: ID поставщика для удаления
-    :return: True если поставщик успешно удален, False в случае ошибки
     """
-    conn = get_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute("DELETE FROM suppliers WHERE id = %s", (id,))
-        conn.commit()
-        print(f"Поставщик с ID '{id}' удален")
-        return True
-    except Exception as e:
-        print(f"Ошибка при удалении поставщика: {e}")
-        conn.rollback()
+        supplier = session.get(Supplier, id)
+        if supplier:
+            session.delete(supplier)
+            session.commit()
+            print(f"Поставщик с ID '{id}' удален")
+            return True
         return False
-    finally:
-        cursor.close()
-        conn.close()
+    except Exception as e:
+        session.rollback()
+        print(f"Ошибка при удалении поставщика: {e}")
+        return False
 
-def update_contact_person(id, new_contact_person):
+def update_contact_person(session: Session, id: int, new_contact_person: str) -> bool:
     """
     Изменяет контактное лицо поставщика по ID.
-    :param id: ID поставщика
-    :param new_contact_person: Новое контактное лицо
     """
-    conn = get_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute("UPDATE suppliers SET contact_person = %s WHERE id = %s", (new_contact_person, id))
-        
-        if cursor.rowcount == 0:
-            print("Поставщик с таким ID не найден.")
-        else:
-            conn.commit()
+        supplier = session.get(Supplier, id)
+        if supplier:
+            supplier.contact_person = new_contact_person
+            session.add(supplier)
+            session.commit()
+            session.refresh(supplier)
             print(f"Контактное лицо изменено на: '{new_contact_person}'")
-            
+            return True
+        else:
+            print("Поставщик с таким ID не найден.")
+            return False
     except Exception as e:
+        session.rollback()
         print(f"Ошибка при обновлении: {e}")
-        conn.rollback()
-    finally:
-        cursor.close()
-        conn.close()
+        return False

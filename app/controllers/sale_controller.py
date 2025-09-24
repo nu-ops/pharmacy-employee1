@@ -1,105 +1,75 @@
-from db.database import get_connection
+from sqlmodel import select, Session
+from typing import List, Optional
+from datetime import date
+from models.sale import Sale
+from models.drug import Drug
 from controllers.drug_controller import update_drug_quantity
 
-def add_sale(drug_id, quantity):
+def add_sale(session: Session, drug_id: int, quantity: int) -> Optional[Sale]:
     """
     Добавляет продажу препарата в базу данных
-    :param drug_id: ID продаваемого препарата
-    :param quantity: Количество продаваемого препарата
-    :return: True если продажа успешно добавлена, False в случае ошибки
     """
-    conn = get_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute("SELECT price, discount_price, quantity FROM drugs WHERE id = %s", (drug_id,))
-        row = cursor.fetchone()
-        
-        if not row:
+        # Получаем препарат
+        drug = session.get(Drug, drug_id)
+        if not drug:
             print("Препарат не найден")
-            return False
+            return None
         
-        # Преобразуем в словарь
-        columns = [desc[0] for desc in cursor.description]
-        drug = dict(zip(columns, row))
-        
-        if drug['quantity'] < quantity:
+        if drug.quantity < quantity:
             print("Недостаточно препарата на складе")
-            return False
+            return None
         
-        # использование скидочной цены если есть, иначе обычную
-        sale_price = drug['discount_price'] if drug['discount_price'] else drug['price']
+        # Использование скидочной цены если есть, иначе обычную
+        sale_price = drug.discount_price if drug.discount_price else drug.price
         total_price = sale_price * quantity
 
-        cursor.execute("""
-            INSERT INTO sales (drug_id, quantity, sale_price)
-            VALUES (%s, %s, %s)
-        """, (drug_id, quantity, sale_price))
+        sale = Sale(
+            drug_id=drug_id,
+            quantity=quantity,
+            sale_price=sale_price
+        )
+        session.add(sale)
         
-        update_drug_quantity(drug_id, -quantity)
+        # Обновляем количество препарата
+        update_drug_quantity(session, drug_id, -quantity)
         
-        conn.commit()
+        session.commit()
+        session.refresh(sale)
         print(f"Продажа добавлена. Общая сумма: {total_price}")
-        return True
+        return sale
         
     except Exception as e:
+        session.rollback()
         print(f"Ошибка при добавлении продажи: {e}")
-        conn.rollback()
-        return False
-    finally:
-        cursor.close()
-        conn.close()
+        return None
 
-def get_all_sales():
+def get_all_sales(session: Session) -> List[Sale]:
     """
     Получает все продажи из базы данных
-    :return: Список всех продаж или пустой список в случае ошибки
     """
-    conn = get_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute("""
-            SELECT s.*, d.name as drug_name 
-            FROM sales s 
-            JOIN drugs d ON s.drug_id = d.id 
-            ORDER BY s.sale_date DESC
-        """)
-        columns = [desc[0] for desc in cursor.description]
-        sales = []
-        for row in cursor.fetchall():
-            sales.append(dict(zip(columns, row)))
+        statement = select(Sale).order_by(Sale.sale_date.desc())
+        sales = session.exec(statement).all()
         return sales
     except Exception as e:
         print(f"Ошибка при получении продаж: {e}")
         return []
-    finally:
-        cursor.close()
-        conn.close()
 
-def get_sales_by_date(start_date, end_date):
+def get_sales_by_date(session: Session, start_date: date, end_date: date) -> List[Sale]:
     """
     Получает продажи за указанный период времени
-    :param start_date: Начальная дата периода
-    :param end_date: Конечная дата периода
-    :return: Список продаж за указанный период или пустой список в случае ошибки
     """
-    conn = get_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute("""
-            SELECT s.*, d.name as drug_name 
-            FROM sales s 
-            JOIN drugs d ON s.drug_id = d.id 
-            WHERE date(s.sale_date) BETWEEN %s AND %s
-            ORDER BY s.sale_date DESC
-        """, (start_date, end_date))
-        columns = [desc[0] for desc in cursor.description]
-        sales = []
-        for row in cursor.fetchall():
-            sales.append(dict(zip(columns, row)))
+        from sqlmodel import and_
+        statement = select(Sale).where(
+            and_(
+                Sale.sale_date >= start_date,
+                Sale.sale_date <= end_date
+            )
+        ).order_by(Sale.sale_date.desc())
+        sales = session.exec(statement).all()
         return sales
     except Exception as e:
         print(f"Ошибка при получении продаж: {e}")
         return []
-    finally:
-        cursor.close()
-        conn.close()
