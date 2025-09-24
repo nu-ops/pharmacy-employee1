@@ -1,6 +1,10 @@
 from sqlmodel import SQLModel, create_engine, Session
 from argon2 import PasswordHasher
+from dotenv import load_dotenv
 import os
+
+# Загрузка переменных окружения
+load_dotenv()
 
 # Инициализация хэшера Argon2
 ph = PasswordHasher()

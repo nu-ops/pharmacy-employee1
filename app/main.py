@@ -1,8 +1,7 @@
-import sys
-import os
 from datetime import datetime
+from dotenv import load_dotenv
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv()
 
 from db.database import init_db, get_session
 from controllers import (drug_controller, sale_controller, supplier_controller, 
