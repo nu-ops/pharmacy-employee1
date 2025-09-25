@@ -19,3 +19,6 @@ python -m venv venv
 3. Установите зависимости: 
 pip install -r requirements.txt
 
+## Пользователи
+Логин: admin  Пароль: admin123
+Логин: nas  Пароль: nas123
